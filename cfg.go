@@ -1,12 +1,15 @@
 package cfg
 
 import (
-	"sync"
-	"os"
+	"context"
 	"encoding/json"
+	"io/ioutil"
+	"os"
 	"reflect"
-	"sync/atomic"
-    "github.com/fsnotify/fsnotify"
+	"sync"
+	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 type Config interface {
@@ -14,61 +17,11 @@ type Config interface {
 	PostLoad(cfgptr interface{}) error
 }
 
-type Source interface {
-	Watch() chan []byte
-	Close()
-}
-
-type File struct {
-    filename string
-    watcher *fsnotify.Watcher
-    contentrw sync.RWMutex
-    content []byte
-    c chan struct{}
-}
-
-func NewFileSource(filename string) (fs *File, err error) {
-    fs = &{
-        filename: filename,
-    }
-    if fs.watcher, err = fsnotify.NewWatcher(); err != nil {
-        return
-    }
-    defer func() {
-        if err != nil {
-            fs.watcher.Close()
-        }
-    }()
-    if err = fs.watcher.Add(filename); err != nil {
-        return
-    }
-    fs.c = make(chan struct{})
-    return
-}
-
-func (f *File) WatchSignal() chan struct{}  {
-    return f.c
-}
-
-func (f *File) Close() {
-    f.watcher.Close()
-    close(f.c)
-}
-
-
-type Decoder interface {
-	Unmarshal(data []byte, v interface{}) error
-}
-
-type JsonDecoder int
-
-func (jd *JsonDecoder) Unmarshal(data []byte, v interface{}) error {
-	return json.Unmarshal(data, v)
-}
-
 type ConfigMeta struct {
 	ct       reflect.Type
-	instance atomic.Value
+	rw       sync.RWMutex
+	instance interface{}
+	version  int64
 	source   Source
 	decoder  Decoder
 	stopped  chan int
@@ -99,36 +52,42 @@ func NewConfigMeta(c interface{}, source Source, opts ...Option) *ConfigMeta {
 
 func (cm *ConfigMeta) Start() {
 	var err error
-	next := cm.source.Watch()
 	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		data, curversion, ok := cm.source.Watch(ctx, cm.version)
+		cancel()
 		select {
-		case data, ok := <-next:
-			if !ok {
-				return
-			}
-			ncv := reflect.New(cm.ct)
-			nc := ncv.Interface().(Config)
-			if err = nc.PreLoad(ncv.Interface()); err != nil {
-				//TODO log this
-				continue
-			}
-			if err = cm.decoder.Unmarshal(data, ncv.Interface()); err != nil {
-				//TODO log this
-				continue
-			}
-			if err = nc.PostLoad(ncv.Interface()); err != nil {
-				//TODO log this
-				continue
-			}
-			cm.instance.Store(ncv.Interface())
 		case <-cm.stopped:
 			return
+		default:
+			if ok {
+				ncv := reflect.New(cm.ct)
+				nc := ncv.Interface().(Config)
+				if err = nc.PreLoad(ncv.Interface()); err != nil {
+					//TODO log this
+					continue
+				}
+				if err = cm.decoder.Unmarshal(data, ncv.Interface()); err != nil {
+					//TODO log this
+					continue
+				}
+				if err = nc.PostLoad(ncv.Interface()); err != nil {
+					//TODO log this
+					continue
+				}
+				cm.rw.Lock()
+				cm.instance = ncv.Interface()
+				cm.version = curversion
+				cm.rw.Unlock()
+			}
 		}
 	}
 }
 
 func (cm *ConfigMeta) Get() interface{} {
-	return cm.instance.Load()
+	cm.rw.RLock()
+	defer cm.rw.RUnlock()
+	return cm.instance
 }
 
 func (cm *ConfigMeta) Stop() {
