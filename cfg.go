@@ -2,14 +2,10 @@ package cfg
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
-	"os"
+	"errors"
 	"reflect"
 	"sync"
 	"time"
-
-	"github.com/fsnotify/fsnotify"
 )
 
 type Config interface {
@@ -21,6 +17,7 @@ type ConfigMeta struct {
 	ct       reflect.Type
 	rw       sync.RWMutex
 	instance interface{}
+	synced   bool
 	version  int64
 	source   Source
 	decoder  Decoder
@@ -50,11 +47,11 @@ func NewConfigMeta(c interface{}, source Source, opts ...Option) *ConfigMeta {
 	return cm
 }
 
-func (cm *ConfigMeta) Start() {
+func (cm *ConfigMeta) Run() {
 	var err error
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		data, curversion, ok := cm.source.Watch(ctx, cm.version)
+		data, curversion, ok := cm.source.Next(ctx, cm.version)
 		cancel()
 		select {
 		case <-cm.stopped:
@@ -78,8 +75,24 @@ func (cm *ConfigMeta) Start() {
 				cm.rw.Lock()
 				cm.instance = ncv.Interface()
 				cm.version = curversion
+				cm.synced = true
 				cm.rw.Unlock()
 			}
+		}
+	}
+}
+
+func (cm *ConfigMeta) WaitSynced() error {
+	for {
+		select {
+		case <-cm.stopped:
+			return errors.New("stopped")
+		default:
+			if cm.synced {
+				return nil
+			}
+			time.Sleep(time.Second)
+			continue
 		}
 	}
 }

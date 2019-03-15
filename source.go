@@ -1,7 +1,16 @@
 package cfg
 
+import (
+	"context"
+	"io/ioutil"
+	"os"
+	"sync"
+
+	"github.com/fsnotify/fsnotify"
+)
+
 type Source interface {
-	Watch(ctx context.Context, oldversion int64) (content []byte, version int64, ok bool)
+	Next(ctx context.Context, oldversion int64) (content []byte, version int64, ok bool)
 	Close()
 }
 
@@ -78,7 +87,7 @@ func (f *File) run() {
 	}
 }
 
-func (f *File) Watch(ctx context.Context, preversion int64) (content []byte, curversion int64, ok bool) {
+func (f *File) Next(ctx context.Context, preversion int64) (content []byte, curversion int64, ok bool) {
 	f.rw.RLock()
 	if f.ver != preversion {
 		defer f.rw.RUnlock()

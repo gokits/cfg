@@ -1,5 +1,9 @@
 package cfg
 
+import (
+	"encoding/json"
+)
+
 type Decoder interface {
 	Unmarshal(data []byte, v interface{}) error
 }
