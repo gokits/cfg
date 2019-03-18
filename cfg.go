@@ -9,8 +9,8 @@ import (
 )
 
 type Config interface {
-	PreLoad(cfgptr interface{}) error
-	PostLoad(cfgptr interface{}) error
+	PreLoad(oldptr interface{}) error
+	PostLoad(oldptr interface{}) error
 }
 
 type ConfigMeta struct {
@@ -60,19 +60,22 @@ func (cm *ConfigMeta) Run() {
 			if ok {
 				ncv := reflect.New(cm.ct)
 				nc := ncv.Interface().(Config)
-				if err = nc.PreLoad(ncv.Interface()); err != nil {
+				cm.rw.Lock()
+				if err = nc.PreLoad(cm.instance); err != nil {
+					cm.rw.Unlock()
 					//TODO log this
 					continue
 				}
 				if err = cm.decoder.Unmarshal(data, ncv.Interface()); err != nil {
+					cm.rw.Unlock()
 					//TODO log this
 					continue
 				}
-				if err = nc.PostLoad(ncv.Interface()); err != nil {
+				if err = nc.PostLoad(cm.instance); err != nil {
+					cm.rw.Unlock()
 					//TODO log this
 					continue
 				}
-				cm.rw.Lock()
 				cm.instance = ncv.Interface()
 				cm.version = curversion
 				cm.synced = true
