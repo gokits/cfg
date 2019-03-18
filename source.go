@@ -43,20 +43,31 @@ func NewFileSource(filename string) (fs *File, err error) {
 	return
 }
 
-func readfile(name string) ([]byte, error) {
-	fh, err := os.OpenFile(name, os.O_RDONLY, 0444)
+func (f *File) readfile() error {
+	fh, err := os.OpenFile(f.filename, os.O_RDONLY, 0444)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer fh.Close()
 	ct, err := ioutil.ReadAll(fh)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return ct, nil
+	fh.Close()
+
+	f.rw.Lock()
+	close(f.c)
+	f.c = make(chan struct{})
+	f.content = ct
+	f.ver += 1
+	f.rw.Unlock()
+	return nil
 }
 
 func (f *File) run() {
+	var err error
+	if err = f.readfile(); err != nil {
+		//TODO log error
+	}
 	for {
 		select {
 		case ev, ok := <-f.watcher.Events:
@@ -65,17 +76,10 @@ func (f *File) run() {
 				return
 			}
 			if ev.Op&(fsnotify.Create|fsnotify.Rename|fsnotify.Write) != 0 {
-				ct, err := readfile(f.filename)
-				if err != nil {
+				if err = f.readfile(); err != nil {
 					//TODO log error
 					continue
 				}
-				f.rw.Lock()
-				close(f.c)
-				f.c = make(chan struct{})
-				f.content = ct
-				f.ver += 1
-				f.rw.Unlock()
 			}
 		case _, ok := <-f.watcher.Errors:
 			f.Close()
