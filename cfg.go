@@ -91,9 +91,12 @@ func (cm *ConfigMeta) WaitSynced() error {
 		case <-cm.stopped:
 			return errors.New("stopped")
 		default:
+			cm.rw.RLock()
 			if cm.synced {
+				cm.rw.RUnlock()
 				return nil
 			}
+			cm.rw.RUnlock()
 			time.Sleep(time.Second)
 			continue
 		}
