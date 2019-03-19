@@ -6,17 +6,28 @@ import (
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/gokits/cfg/decoder/json"
+	"github.com/gokits/cfg/logger"
 )
 
-type Config interface {
-	PreLoad(oldptr interface{}) error
-	PostLoad(oldptr interface{}) error
+type PreDecoder interface {
+	PreDecode(oldptr interface{}) error
+}
+
+type PostDecoder interface {
+	PostDecode(oldptr interface{}) error
+}
+
+type PostSwapper interface {
+	PostSwap(oldptr interface{})
 }
 
 type ConfigMeta struct {
 	ct       reflect.Type
 	rw       sync.RWMutex
 	instance interface{}
+	logger   logger.LeveledLogger
 	synced   bool
 	version  int64
 	source   Source
@@ -32,10 +43,16 @@ func WithDecoder(d Decoder) Option {
 	}
 }
 
+func WithLogger(logger logger.LeveledLogger) Option {
+	return func(cm *ConfigMeta) {
+		cm.logger = logger
+	}
+}
+
 func NewConfigMeta(c interface{}, source Source, opts ...Option) *ConfigMeta {
 	cm := &ConfigMeta{
 		ct:      reflect.TypeOf(c),
-		decoder: new(JsonDecoder),
+		decoder: new(json.JsonDecoder),
 		source:  source,
 	}
 	if cm.ct.Kind() == reflect.Ptr {
@@ -48,7 +65,13 @@ func NewConfigMeta(c interface{}, source Source, opts ...Option) *ConfigMeta {
 }
 
 func (cm *ConfigMeta) Run() {
-	var err error
+	var (
+		err         error
+		predecoder  PreDecoder
+		postdecoder PostDecoder
+		postswapper PostSwapper
+		old         interface{}
+	)
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		data, curversion, ok := cm.source.Next(ctx, cm.version)
@@ -59,27 +82,41 @@ func (cm *ConfigMeta) Run() {
 		default:
 			if ok {
 				ncv := reflect.New(cm.ct)
-				nc := ncv.Interface().(Config)
-				cm.rw.Lock()
-				if err = nc.PreLoad(cm.instance); err != nil {
-					cm.rw.Unlock()
-					//TODO log this
-					continue
+				if predecoder, ok = ncv.Interface().(PreDecoder); ok {
+					if err = predecoder.PreDecode(cm.instance); err != nil {
+						if cm.logger != nil {
+							cm.logger.Infof("PreDecode error: %v", err)
+						}
+						continue
+					}
 				}
+
 				if err = cm.decoder.Unmarshal(data, ncv.Interface()); err != nil {
-					cm.rw.Unlock()
-					//TODO log this
+					if cm.logger != nil {
+						cm.logger.Warnf("Unmarshal error: %v, data: %s", err, string(data))
+					}
 					continue
 				}
-				if err = nc.PostLoad(cm.instance); err != nil {
-					cm.rw.Unlock()
-					//TODO log this
-					continue
+				if postdecoder, ok = ncv.Interface().(PostDecoder); ok {
+					if err = postdecoder.PostDecode(cm.instance); err != nil {
+						if cm.logger != nil {
+							cm.logger.Infof("PostDecode error: %v", err)
+						}
+						continue
+					}
 				}
+				cm.rw.Lock()
+				old = cm.instance
 				cm.instance = ncv.Interface()
 				cm.version = curversion
 				cm.synced = true
 				cm.rw.Unlock()
+				if cm.logger != nil {
+					cm.logger.Infof("success swap config. version: %d", cm.version)
+				}
+				if postswapper, ok = ncv.Interface().(PostSwapper); ok {
+					postswapper.PostSwap(old)
+				}
 			}
 		}
 	}
