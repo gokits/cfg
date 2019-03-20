@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gokits/cfg/decoder/json"
-	"github.com/gokits/cfg/logger"
+	logger "github.com/gokits/stdlogger"
 )
 
 type PreDecoder interface {

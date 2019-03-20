@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/gokits/cfg/logger"
+	logger "github.com/gokits/stdlogger"
 )
 
 type File struct {
