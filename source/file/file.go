@@ -28,9 +28,12 @@ func WithLogger(log logger.LeveledLogger) Option {
 	}
 }
 
-func NewFileSource(filename string) (fs *File, err error) {
+func NewFileSource(filename string, opts ...Option) (fs *File, err error) {
 	fs = &File{
 		filename: filename,
+	}
+	for _, opt := range opts {
+		opt(fs)
 	}
 	if fs.watcher, err = fsnotify.NewWatcher(); err != nil {
 		return
