@@ -3,6 +3,8 @@ github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/gokits/stdlogger v0.1.0 h1:TQHkDmaLRnZdogTGcC6ghZ7PU9Wqq/9SfDntg+TjkbY=
 github.com/gokits/stdlogger v0.1.0/go.mod h1:VJReMeJctiyjVa90TwuXYXjJCCmSIB3qZoaRXVVZCrE=
+github.com/gokits/stdlogger v0.2.0 h1:kG885y/oEvRI0cidQBuHXVgpqOaSUqFGxXzhHsvUQjk=
+github.com/gokits/stdlogger v0.2.0/go.mod h1:VJReMeJctiyjVa90TwuXYXjJCCmSIB3qZoaRXVVZCrE=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/sirupsen/logrus v1.4.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=

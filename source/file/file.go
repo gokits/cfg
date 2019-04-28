@@ -5,9 +5,11 @@ import (
 	"io/ioutil"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	logger "github.com/gokits/stdlogger"
+	"github.com/gokits/stdlogger/nooplogger"
 )
 
 type File struct {
@@ -31,6 +33,7 @@ func WithLogger(log logger.LeveledLogger) Option {
 func NewFileSource(filename string, opts ...Option) (fs *File, err error) {
 	fs = &File{
 		filename: filename,
+		logger:   nooplogger.Default(),
 	}
 	for _, opt := range opts {
 		opt(fs)
@@ -56,11 +59,11 @@ func (f *File) readfile() error {
 	if err != nil {
 		return err
 	}
+	defer fh.Close()
 	ct, err := ioutil.ReadAll(fh)
 	if err != nil {
 		return err
 	}
-	fh.Close()
 
 	f.rw.Lock()
 	close(f.c)
@@ -74,11 +77,37 @@ func (f *File) readfile() error {
 func (f *File) run() {
 	var err error
 	if err = f.readfile(); err != nil {
-		if f.logger != nil {
-			f.logger.Warnf("readfile of %s failed: %v", f.filename, err)
-		}
+		f.logger.Warnf("readfile of %s failed: %v", f.filename, err)
 	}
+	watched := true
 	for {
+		for !watched {
+			select {
+			case e, ok := <-f.watcher.Events:
+				if !ok {
+					f.Close()
+					return
+				}
+				f.logger.Warnf("unexpected watched event %v", e)
+			case _, ok := <-f.watcher.Errors:
+				f.Close()
+				if ok {
+					f.logger.Warnf("watched error %v", err)
+				}
+				return
+			default:
+			}
+			if err = f.watcher.Add(f.filename); err != nil {
+				f.logger.Errorf("watcher read %s failed: %v", f.filename, err)
+				time.Sleep(time.Second)
+				continue
+			}
+			watched = true
+			if err = f.readfile(); err != nil {
+				f.logger.Warnf("readfile of %s failed: %v", f.filename, err)
+			}
+		}
+
 		select {
 		case ev, ok := <-f.watcher.Events:
 			if !ok {
@@ -87,15 +116,20 @@ func (f *File) run() {
 			}
 			if ev.Op&(fsnotify.Create|fsnotify.Rename|fsnotify.Write) != 0 {
 				if err = f.readfile(); err != nil {
-					if f.logger != nil {
-						f.logger.Warnf("readfile of %s failed: %v", f.filename, err)
-					}
+					f.logger.Warnf("readfile of %s failed: %v", f.filename, err)
 					continue
 				}
 			}
+			if ev.Op&fsnotify.Remove != 0 {
+				f.logger.Infof("watched remove event of %s", f.filename)
+				if err = f.watcher.Remove(f.filename); err != nil {
+					f.logger.Errorf("watcher remove %s failed: %v", f.filename, err)
+				}
+				watched = false
+			}
 		case _, ok := <-f.watcher.Errors:
 			f.Close()
-			if ok && f.logger != nil {
+			if ok {
 				f.logger.Warnf("readfile of %s failed: %v", f.filename, err)
 			}
 			return
