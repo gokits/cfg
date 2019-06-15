@@ -40,6 +40,9 @@ func TestFileUpdate(t *testing.T) {
 	if string(c) != "abc" {
 		t.Fatalf("init content should be 'abc', actual=%s\n", string(c))
 	}
+	if v < 1 {
+		t.Fatalf("version expected >= 1, actually %d\n", v)
+	}
 	f.WriteString("abc")
 	f.Sync()
 	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second)

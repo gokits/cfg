@@ -54,6 +54,7 @@ func NewConfigMeta(c interface{}, source Source, opts ...Option) *ConfigMeta {
 		ct:      reflect.TypeOf(c),
 		decoder: new(json.JsonDecoder),
 		source:  source,
+		stopped: make(chan int),
 	}
 	if cm.ct.Kind() == reflect.Ptr {
 		cm.ct = cm.ct.Elem()
@@ -66,7 +67,9 @@ func NewConfigMeta(c interface{}, source Source, opts ...Option) *ConfigMeta {
 
 func (cm *ConfigMeta) Run() {
 	var (
+		ok          bool
 		err         error
+		tmpv        int64
 		predecoder  PreDecoder
 		postdecoder PostDecoder
 		postswapper PostSwapper
@@ -74,13 +77,15 @@ func (cm *ConfigMeta) Run() {
 	)
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		data, curversion, ok := cm.source.Next(ctx, cm.version)
+		var data []byte
+		data, tmpv, ok = cm.source.Next(ctx, cm.version)
 		cancel()
 		select {
 		case <-cm.stopped:
 			return
 		default:
 			if ok {
+				cm.version = tmpv
 				ncv := reflect.New(cm.ct)
 				if predecoder, ok = ncv.Interface().(PreDecoder); ok {
 					if err = predecoder.PreDecode(cm.instance); err != nil {
@@ -108,7 +113,6 @@ func (cm *ConfigMeta) Run() {
 				cm.rw.Lock()
 				old = cm.instance
 				cm.instance = ncv.Interface()
-				cm.version = curversion
 				cm.synced = true
 				cm.rw.Unlock()
 				if cm.logger != nil {
