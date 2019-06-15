@@ -66,6 +66,7 @@ func NewConfigMeta(c interface{}, source Source, opts ...Option) *ConfigMeta {
 
 func (cm *ConfigMeta) Run() {
 	var (
+		ok          bool
 		err         error
 		predecoder  PreDecoder
 		postdecoder PostDecoder
@@ -74,7 +75,8 @@ func (cm *ConfigMeta) Run() {
 	)
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		data, curversion, ok := cm.source.Next(ctx, cm.version)
+		var data []byte
+		data, cm.version, ok = cm.source.Next(ctx, cm.version)
 		cancel()
 		select {
 		case <-cm.stopped:
@@ -108,7 +110,6 @@ func (cm *ConfigMeta) Run() {
 				cm.rw.Lock()
 				old = cm.instance
 				cm.instance = ncv.Interface()
-				cm.version = curversion
 				cm.synced = true
 				cm.rw.Unlock()
 				if cm.logger != nil {
