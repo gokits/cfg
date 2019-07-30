@@ -5,9 +5,9 @@
 1. Customizable decoders(json out of box)
 1. Customizable config source(reloadable file source out of box)
 1. Hooks in config lifecycle, and can be used to customize behavior of cfg package:
-  1. PreDecoder: called before new config decoding from source. It can be used to set default value.
-  1. PostDecoder: called after new config decoding from source. It can be used to validate new config.
-  1. PostSwap: called after new config taked effect(implemented by atomic swap pointers). It can be used to notify that new config is reloaded.
+   1. PreDecoder: called before new config decoding from source. It can be used to set default value.
+   1. PostDecoder: called after new config decoding from source. It can be used to validate new config.
+   1. PostSwap: called after new config taked effect(implemented by atomic swap pointers). It can be used to notify that new config is reloaded.
 1. Simple logger interface to log events. 
 
 ## How to use
@@ -60,9 +60,9 @@ func main() {
 ## Roadmap
 1. [done] reloadable file source
 1. [done] custimizable hooks
-1. [ ] export config version
-1. [ ] frozen package api and release v1
-1. [ ] implement other config source(etcd, consul...)
+1. [todo] export config version
+1. [todo] frozen package api and release v1
+1. [todo] implement other config source(etcd, consul...)
 
 ## Status
 This package has been used in production environment running on our kubernetes clusters. It works well with configmap of kubernetes and files. 
