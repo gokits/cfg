@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/gokits/stdlogger/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 func TestFileUpdate(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
 	dir, err := ioutil.TempDir("", "gokits-cfg-test")
 	if err != nil {
 		t.Fatalf("create temp dir with prefix gokits-cfg-test failed: %v\n", err)
@@ -57,6 +59,7 @@ func TestFileUpdate(t *testing.T) {
 }
 
 func TestFileRemove(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
 	dir, err := ioutil.TempDir("", "gokits-cfg-test")
 	if err != nil {
 		t.Fatalf("create temp dir with prefix gokits-cfg-test failed: %v\n", err)
@@ -108,6 +111,7 @@ func TestFileRemove(t *testing.T) {
 }
 
 func TestFileRename(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
 	dir, err := ioutil.TempDir("", "gokits-cfg-test")
 	if err != nil {
 		t.Fatalf("create temp dir with prefix gokits-cfg-test failed: %v\n", err)
@@ -153,6 +157,6 @@ func TestFileRename(t *testing.T) {
 		t.Fatal("init Next failed with no content")
 	}
 	if string(c) != "bcd" {
-		t.Fatalf("init content should be 'abc', actual=%s\n", string(c))
+		t.Fatalf("init content should be 'bcd', actual=%s\n", string(c))
 	}
 }
