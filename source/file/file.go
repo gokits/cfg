@@ -113,21 +113,7 @@ func (f *File) run() {
 				return
 			}
 			f.logger.Debugf("watched event: %v", ev)
-			if ev.Op&fsnotify.Write == fsnotify.Write {
-				if err = f.readfile(); err != nil {
-					f.logger.Warnf("Write: readfile of %s failed: %v", f.filename, err)
-				}
-			} else if ev.Op&fsnotify.Rename == fsnotify.Rename {
-				if err = f.readfile(); err != nil {
-					f.logger.Warnf("Rename: readfile of %s failed: %v", f.filename, err)
-					watched = false
-					continue
-				}
-			}
-			if ev.Op&fsnotify.Remove == fsnotify.Remove {
-				watched = false
-				continue
-			}
+			watched = f.handleEvent(ev)
 		case err, ok := <-f.watcher.Errors:
 			f.Close()
 			if ok {
