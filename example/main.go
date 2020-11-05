@@ -43,7 +43,8 @@ func main() {
 
 	var err error
 
-	if filesource, err = file.NewFileSource(cfgfile, file.WithLogger(stdlogrus.FromGlobal())); err != nil {
+	filesource = file.NewFileSource(cfgfile, file.WithLogger(stdlogrus.FromGlobal()))
+	if err = filesource.Start(); err != nil {
 		logrus.Fatal(err)
 	}
 	meta = cfg.NewConfigMeta(Config{}, filesource, cfg.WithLogger(stdlogrus.FromGlobal()))

@@ -2,12 +2,14 @@ package file
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/gokits/cfg"
 	logger "github.com/gokits/stdlogger"
 	"github.com/gokits/stdlogger/nooplogger"
 )
@@ -30,24 +32,34 @@ func WithLogger(log logger.LeveledLogger) Option {
 	}
 }
 
-func NewFileSource(filename string, opts ...Option) (fs *File, err error) {
+func WithFilePath(filepath string) Option {
+	return func(f *File) {
+		f.filename = filepath
+	}
+}
+
+func NewFileSource(filepath string, opts ...Option) (fs *File) {
 	fs = &File{
-		filename: filename,
+		filename: filepath,
 		logger:   nooplogger.Default(),
+		c:        make(chan struct{}),
 	}
 	for _, opt := range opts {
 		opt(fs)
 	}
-	if fs.watcher, err = fsnotify.NewWatcher(); err != nil {
+	return
+}
+
+func (f *File) Start() (err error) {
+	if f.watcher, err = fsnotify.NewWatcher(); err != nil {
 		return
 	}
 	defer func() {
 		if err != nil {
-			fs.watcher.Close()
+			f.watcher.Close()
 		}
 	}()
-	fs.c = make(chan struct{})
-	go fs.run()
+	go f.run()
 	return
 }
 
@@ -157,3 +169,9 @@ func (f *File) Close() {
 		close(f.c)
 	}
 }
+
+func (f *File) String() string {
+	return fmt.Sprintf("filesource(%s)", f.filename)
+}
+
+var _ cfg.Source = &File{}

@@ -3,7 +3,19 @@ package mem
 import (
 	"context"
 	"sync"
+
+	"github.com/gokits/cfg"
 )
+
+const (
+	Name string = "memory"
+)
+
+type SourceMemOption bool
+
+func NewSourceMemory() *Memory {
+	return &Memory{}
+}
 
 type Memory struct {
 	rw sync.RWMutex
@@ -20,6 +32,10 @@ func (m *Memory) Set(newc []byte) {
 	m.content = newc
 	m.ver++
 	m.rw.Unlock()
+}
+
+func (m *Memory) Start() error {
+	return nil
 }
 
 func (m *Memory) Next(ctx context.Context, oldversion int64) (content []byte, curversion int64, ok bool) {
@@ -52,3 +68,9 @@ func (m *Memory) Close() {
 		close(m.c)
 	}
 }
+
+func (m *Memory) String() string {
+	return "memorysource"
+}
+
+var _ cfg.Source = &Memory{}

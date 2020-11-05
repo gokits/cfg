@@ -28,6 +28,14 @@ func (ms *MockSource) Close() {
 
 }
 
+func (ms *MockSource) String() string {
+	return "mocksource"
+}
+
+func (ms *MockSource) Start() error {
+	return nil
+}
+
 type Config struct {
 	A string
 }

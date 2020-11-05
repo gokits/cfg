@@ -26,9 +26,10 @@ func TestFileUpdate(t *testing.T) {
 	}
 	defer f.Close()
 	t.Logf("create temp file %s\n", f.Name())
-	f.WriteString("abc")
+	_, _ = f.WriteString("abc")
 	f.Sync()
-	fs, err := NewFileSource(pathstr, WithLogger(logrus.FromGlobal()))
+	fs := NewFileSource(pathstr, WithLogger(logrus.FromGlobal()))
+	err = fs.Start()
 	if err != nil {
 		t.Fatalf("new file source with path %s failed: %v\n", pathstr, err)
 	}
@@ -74,8 +75,8 @@ func TestFileRemove(t *testing.T) {
 	f.WriteString("abc")
 	f.Sync()
 	f.Close()
-	fs, err := NewFileSource(pathstr, WithLogger(logrus.FromGlobal()))
-	if err != nil {
+	fs := NewFileSource(pathstr, WithLogger(logrus.FromGlobal()))
+	if err = fs.Start(); err != nil {
 		t.Fatalf("new file source with path %s failed: %v\n", pathstr, err)
 	}
 	defer fs.Close()
@@ -126,8 +127,8 @@ func TestFileRename(t *testing.T) {
 	f.WriteString("abc")
 	f.Sync()
 	f.Close()
-	fs, err := NewFileSource(pathstr, WithLogger(logrus.FromGlobal()))
-	if err != nil {
+	fs := NewFileSource(pathstr, WithLogger(logrus.FromGlobal()))
+	if err = fs.Start(); err != nil {
 		t.Fatalf("new file source with path %s failed: %v\n", pathstr, err)
 	}
 	defer fs.Close()
