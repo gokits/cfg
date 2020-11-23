@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	validator "github.com/go-playground/validator/v10"
 	"github.com/gokits/cfg"
 	"github.com/gokits/cfg/source/file"
 	stdlogrus "github.com/gokits/stdlogger/logrus"
 	"github.com/sirupsen/logrus"
-	validator "gopkg.in/go-playground/validator.v9"
 )
 
 type Config struct {
