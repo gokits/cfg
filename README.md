@@ -13,7 +13,7 @@
 ## How to use
 ```golang
 import (
-    validator "gopkg.in/go-playground/validator.v9"
+    validator "github.com/go-playground/validator/v10"
     "github.com/gokits/cfg"
     "github.com/gokits/cfg/source/file"
 )

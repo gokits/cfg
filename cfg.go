@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	validator "github.com/go-playground/validator/v10"
 	"github.com/gokits/cfg/decoder/json"
 	logger "github.com/gokits/stdlogger"
+	nooplogger "github.com/gokits/stdlogger/nooplogger"
 )
 
 type PreDecoder interface {
@@ -24,15 +26,16 @@ type PostSwapper interface {
 }
 
 type ConfigMeta struct {
-	ct       reflect.Type
-	rw       sync.RWMutex
-	instance interface{}
-	logger   logger.LeveledLogger
-	synced   bool
-	version  int64
-	source   Source
-	decoder  Decoder
-	stopped  chan int
+	ct            reflect.Type
+	rw            sync.RWMutex
+	instance      interface{}
+	logger        logger.LeveledLogger
+	validatorInst *validator.Validate
+	synced        bool
+	version       int64
+	source        Source
+	decoder       Decoder
+	stopped       chan int
 }
 
 type Option func(cm *ConfigMeta)
@@ -49,12 +52,20 @@ func WithLogger(logger logger.LeveledLogger) Option {
 	}
 }
 
+func WithValidator(v *validator.Validate) Option {
+	return func(cm *ConfigMeta) {
+		cm.validatorInst = v
+	}
+}
+
 func NewConfigMeta(c interface{}, source Source, opts ...Option) *ConfigMeta {
 	cm := &ConfigMeta{
-		ct:      reflect.TypeOf(c),
-		decoder: new(json.JsonDecoder),
-		source:  source,
-		stopped: make(chan int),
+		ct:            reflect.TypeOf(c),
+		decoder:       new(json.JsonDecoder),
+		source:        source,
+		stopped:       make(chan int),
+		logger:        nooplogger.Default(),
+		validatorInst: validator.New(),
 	}
 	if cm.ct.Kind() == reflect.Ptr {
 		cm.ct = cm.ct.Elem()
@@ -89,24 +100,24 @@ func (cm *ConfigMeta) Run() {
 				ncv := reflect.New(cm.ct)
 				if predecoder, ok = ncv.Interface().(PreDecoder); ok {
 					if err = predecoder.PreDecode(cm.instance); err != nil {
-						if cm.logger != nil {
-							cm.logger.Infof("PreDecode error: %v", err)
-						}
+						cm.logger.Infof("PreDecode error: %v", err)
 						continue
 					}
 				}
 
 				if err = cm.decoder.Unmarshal(data, ncv.Interface()); err != nil {
-					if cm.logger != nil {
-						cm.logger.Warnf("Unmarshal error: %v, data: %s", err, string(data))
-					}
+					cm.logger.Warnf("Unmarshal error: %v, data: %s", err, string(data))
 					continue
+				}
+				if cm.validatorInst != nil {
+					if err = cm.validatorInst.Struct(ncv.Interface()); err != nil {
+						cm.logger.Warnf("Values invalid with validator: %v", err)
+						continue
+					}
 				}
 				if postdecoder, ok = ncv.Interface().(PostDecoder); ok {
 					if err = postdecoder.PostDecode(cm.instance); err != nil {
-						if cm.logger != nil {
-							cm.logger.Infof("PostDecode error: %v", err)
-						}
+						cm.logger.Infof("PostDecode error: %v", err)
 						continue
 					}
 				}
@@ -115,9 +126,7 @@ func (cm *ConfigMeta) Run() {
 				cm.instance = ncv.Interface()
 				cm.synced = true
 				cm.rw.Unlock()
-				if cm.logger != nil {
-					cm.logger.Infof("success swap config. version: %d", cm.version)
-				}
+				cm.logger.Infof("success swap config. version: %d", cm.version)
 				if postswapper, ok = ncv.Interface().(PostSwapper); ok {
 					postswapper.PostSwap(old)
 				}
