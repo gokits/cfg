@@ -153,6 +153,26 @@ func (cm *ConfigMeta) WaitSynced() error {
 	}
 }
 
+func (cm *ConfigMeta) WaitSynced2(ctx context.Context) error {
+	for {
+		select {
+		case <-cm.stopped:
+			return errors.New("stopped")
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			cm.rw.RLock()
+			if cm.synced {
+				cm.rw.RUnlock()
+				return nil
+			}
+			cm.rw.RUnlock()
+			time.Sleep(time.Second)
+			continue
+		}
+	}
+}
+
 func (cm *ConfigMeta) Get() interface{} {
 	cm.rw.RLock()
 	defer cm.rw.RUnlock()
